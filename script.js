@@ -15,59 +15,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedDate = null;
     let selectedTime = null;
 
-    // --- Define Office Working Hours ---
-    const OFFICE_START_HOUR = 10; // 10 AM
-    const OFFICE_END_HOUR = 19;   // 7 PM (19:00 in 24-hour format)
-    const INTERVIEW_DURATION_MINS = 30; // Each time slot duration
-    const DAYS_OF_WEEK = {
-        SUNDAY: 0,
+    // --- Define Interview Schedule Rules ---
+    const INTERVIEW_DAYS = {
         MONDAY: 1,
-        SATURDAY: 6
+        WEDNESDAY: 3,
+        FRIDAY: 5
     };
+    const AVAILABLE_TIMES_PER_DAY = ['11:00 AM', '04:00 PM']; // Both slots will be available
 
     // Mock data for *pre-booked* slots (for demo purposes)
-    // These are specific slots that are already taken within the working hours
+    // These are specific slots that are already taken within the allowed times
     const mockBookedSlots = {
-        '2025-05-27': ['10:00 AM', '02:00 PM'], // Example: May 27th, 2025, 10 AM and 2 PM are booked
-        '2025-06-05': ['11:00 AM'] // Example: June 5th, 2025, 11 AM is booked
+        // Example: 'YYYY-MM-DD': ['HH:MM AM/PM', ...]
+        '2025-05-23': ['04:00 PM'], // Example: Friday, May 23rd, 2025, 4 PM is booked
+        '2025-05-26': ['11:00 AM']  // Example: Monday, May 26th, 2025, 11 AM is booked
     };
-
-    // --- Helper function to format time ---
-    const formatTime = (hour, minute) => {
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
-        const formattedMinute = String(minute).padStart(2, '0');
-        return `${formattedHour}:${formattedMinute} ${ampm}`;
-    };
-
-    // --- Generate available time slots based on office hours ---
-    const generateDailySlots = (dateKey) => {
-        const slots = [];
-        const booked = mockBookedSlots[dateKey] || [];
-
-        for (let hour = OFFICE_START_HOUR; hour < OFFICE_END_HOUR; hour++) {
-            // Add full hour slots
-            const slot1 = formatTime(hour, 0);
-            if (!booked.includes(slot1)) {
-                slots.push(slot1);
-            }
-
-            // Add half-hour slots if duration allows and it's before end hour
-            if (INTERVIEW_DURATION_MINS <= 30 && (hour * 60 + 30) < (OFFICE_END_HOUR * 60)) {
-                const slot2 = formatTime(hour, 30);
-                if (!booked.includes(slot2)) {
-                    slots.push(slot2);
-                }
-            }
-        }
-        return slots;
-    };
-
 
     // --- Calendar Rendering ---
     const renderCalendar = () => {
         calendarGrid.innerHTML = ''; // Clear previous days
-        timeSlotsContainer.innerHTML = '<p class="no-slots">Select a date to see available times.</p>';
+        timeSlotsContainer.innerHTML = '<p class="no-slots">Select an available date to see time slots.</p>';
         nextStep1Btn.disabled = true;
 
         const date = new Date(currentYear, currentMonth, 1);
@@ -101,9 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const fullDate = new Date(currentYear, currentMonth, i);
             fullDate.setHours(0, 0, 0, 0); // Normalize for comparison
+            const dayOfWeek = fullDate.getDay();
 
-            // Disable past dates OR Sundays
-            if (fullDate < today || fullDate.getDay() === DAYS_OF_WEEK.SUNDAY) {
+            // Disable past dates OR dates that are NOT Mon, Wed, or Fri
+            if (fullDate < today ||
+                (dayOfWeek !== INTERVIEW_DAYS.MONDAY &&
+                 dayOfWeek !== INTERVIEW_DAYS.WEDNESDAY &&
+                 dayOfWeek !== INTERVIEW_DAYS.FRIDAY)) {
                 dayDiv.classList.add('inactive');
             } else {
                 dayDiv.addEventListener('click', () => selectDate(dayDiv, fullDate));
@@ -137,26 +108,28 @@ document.addEventListener('DOMContentLoaded', () => {
         nextStep1Btn.disabled = true;
 
         const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const bookedSlotsForThisDay = mockBookedSlots[dateKey] || []; // Get specific booked slots for this day
 
-        // Get available slots based on office hours and mock booked slots
-        const slots = generateDailySlots(dateKey);
-        const bookedSlotsForThisDay = mockBookedSlots[dateKey] || [];
+        // Generate all AVAILABLE_TIMES_PER_DAY and then check if they are booked
+        const slotsToDisplay = [];
+        AVAILABLE_TIMES_PER_DAY.forEach(slot => {
+            if (!bookedSlotsForThisDay.includes(slot)) {
+                slotsToDisplay.push(slot);
+            }
+        });
 
-        if (slots.length === 0) {
+
+        if (slotsToDisplay.length === 0) {
             timeSlotsContainer.innerHTML = '<p class="no-slots">No time slots available for this date.</p>';
             return;
         }
 
-        slots.forEach(slot => {
+        slotsToDisplay.forEach(slot => {
             const slotDiv = document.createElement('div');
             slotDiv.classList.add('time-slot');
             slotDiv.textContent = slot;
 
-            if (bookedSlotsForThisDay.includes(slot)) {
-                 slotDiv.classList.add('booked');
-            } else {
-                slotDiv.addEventListener('click', () => selectTime(slotDiv, slot));
-            }
+            slotDiv.addEventListener('click', () => selectTime(slotDiv, slot));
 
             timeSlotsContainer.appendChild(slotDiv);
         });
@@ -233,12 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const jobRole = document.getElementById('jobRole').value;
 
         // In a real application, you would send this data to your backend server
-        // The backend would then:
-        // 1. Validate the booking (e.g., ensure slot is still available)
-        // 2. Interact with Zoom/Google Calendar APIs to create the meeting
-        // 3. Store the booking in a database
-        // 4. Send confirmation emails
-
         // For this mock-up, we just display the confirmation details
         document.getElementById('confDate').textContent = selectedDate.toDateString();
         document.getElementById('confTime').textContent = selectedTime;
