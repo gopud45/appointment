@@ -21,12 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
         WEDNESDAY: 3,
         FRIDAY: 5
     };
-    const AVAILABLE_TIMES_PER_DAY = ['11:00 AM', '04:00 PM']; // Both slots will be available
+    // These are the *only* two slots that will ever be offered on interview days
+    const FIXED_INTERVIEW_SLOTS = ['11:00 AM', '04:00 PM'];
 
     // Mock data for *pre-booked* slots (for demo purposes)
-    // These are specific slots that are already taken within the allowed times
+    // These are specific slots that are already taken within the allowed times.
+    // Format: 'YYYY-MM-DD': ['HH:MM AM/PM', ...]
     const mockBookedSlots = {
-        // Example: 'YYYY-MM-DD': ['HH:MM AM/PM', ...]
         '2025-05-23': ['04:00 PM'], // Example: Friday, May 23rd, 2025, 4 PM is booked
         '2025-05-26': ['11:00 AM']  // Example: Monday, May 26th, 2025, 11 AM is booked
     };
@@ -110,29 +111,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         const bookedSlotsForThisDay = mockBookedSlots[dateKey] || []; // Get specific booked slots for this day
 
-        // Generate all AVAILABLE_TIMES_PER_DAY and then check if they are booked
-        const slotsToDisplay = [];
-        AVAILABLE_TIMES_PER_DAY.forEach(slot => {
-            if (!bookedSlotsForThisDay.includes(slot)) {
-                slotsToDisplay.push(slot);
-            }
-        });
-
-
-        if (slotsToDisplay.length === 0) {
-            timeSlotsContainer.innerHTML = '<p class="no-slots">No time slots available for this date.</p>';
-            return;
-        }
-
-        slotsToDisplay.forEach(slot => {
+        // Always attempt to display both 11 AM and 4 PM
+        let slotsAvailableCount = 0;
+        FIXED_INTERVIEW_SLOTS.forEach(slot => {
             const slotDiv = document.createElement('div');
             slotDiv.classList.add('time-slot');
             slotDiv.textContent = slot;
 
-            slotDiv.addEventListener('click', () => selectTime(slotDiv, slot));
-
+            if (bookedSlotsForThisDay.includes(slot)) {
+                slotDiv.classList.add('booked'); // Mark as booked
+                // Do NOT add event listener, as it's booked
+            } else {
+                slotDiv.addEventListener('click', () => selectTime(slotDiv, slot));
+                slotsAvailableCount++; // Increment if available for booking
+            }
             timeSlotsContainer.appendChild(slotDiv);
         });
+
+        // If after checking both fixed slots, none are available
+        if (slotsAvailableCount === 0 && FIXED_INTERVIEW_SLOTS.length > 0) {
+            timeSlotsContainer.innerHTML = '<p class="no-slots">No time slots available for this date.</p>';
+        }
+        // Special case: If FIXED_INTERVIEW_SLOTS is empty, handle that too
+        else if (FIXED_INTERVIEW_SLOTS.length === 0) {
+             timeSlotsContainer.innerHTML = '<p class="no-slots">No time slots defined for interviews.</p>';
+        }
+
     };
 
     const selectTime = (slotDiv, time) => {
