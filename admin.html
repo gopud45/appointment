@@ -1,0 +1,1825 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Panel - Interview Scheduler</title>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+  />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+    :root {
+      --primary-blue: #007bff;
+      --light-blue: #e7f3ff;
+      --text-dark: #333;
+      --text-light: #666;
+      --border-color: #ddd;
+      --success-green: #28a745;
+      --error-red: #dc3545;
+      --warning-yellow: #ffc107;
+      --info-blue: #17a2b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background-color: #f3f4f6;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: auto 1fr;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background-color: var(--primary-blue);
+      color: white;
+      padding: 20px;
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .sidebar h2 {
+      font-size: 1.8em;
+      margin-bottom: 30px;
+    }
+
+    .sidebar nav ul {
+      list-style: none;
+      padding: 0;
+      width: 100%;
+    }
+
+    .sidebar nav li {
+      margin-bottom: 15px;
+    }
+
+    .sidebar nav a {
+      display: block;
+      color: white;
+      text-decoration: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      transition: background-color 0.2s ease;
+      font-weight: 600;
+    }
+
+    .sidebar nav a.active,
+    .sidebar nav a:hover {
+      background-color: #0056b3;
+    }
+
+    /* Main Content */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background-color: white;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 10;
+    }
+
+    .header h1 {
+      font-size: 2em;
+      color: var(--text-dark);
+      margin: 0;
+    }
+
+    .content-area {
+      padding: 20px;
+      position: relative;
+      z-index: 1;
+      overflow-y: auto;
+      max-height: calc(100vh - 80px);
+      position: relative;
+    }
+
+    /* Loading Overlay */
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      border-radius: 8px;
+      user-select: none;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #loading-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary-blue);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
+    }
+
+    /* Dashboard */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .dashboard-card {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dashboard-card h3 {
+      color: var(--primary-blue);
+      margin-top: 0;
+      font-size: 1.5em;
+      margin-bottom: 10px;
+    }
+
+    .dashboard-card p {
+      font-size: 1.4em;
+      color: var(--text-dark);
+      font-weight: 700;
+    }
+
+    /* Small charts container */
+    .chart-container {
+      margin-top: 15px;
+      height: 60px;
+      width: 100%;
+    }
+
+    /* Quick actions grid */
+    .quick-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    .fab-button {
+      background-color: var(--primary-blue);
+      color: white;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4);
+      transition: background-color 0.3s ease;
+      font-size: 1.25rem;
+      user-select: none;
+    }
+
+    .fab-button:hover {
+      background-color: #0056b3;
+    }
+
+    .fab-label {
+      margin-top: 6px;
+      font-size: 0.85em;
+      color: var(--text-dark);
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .fab-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Time Slot Management */
+    .time-management-section {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      max-width: 600px;
+    }
+
+    .time-management-section h2 {
+      color: var(--text-dark);
+      font-size: 1.8em;
+      margin-bottom: 15px;
+    }
+
+    .day-toggle {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .day-toggle label {
+      width: 100px;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-right: 15px;
+      text-transform: capitalize;
+    }
+
+    .toggle-button {
+      padding: 8px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      font-size: 0.9em;
+      transition: background-color 0.2s ease;
+      min-width: 60px;
+      user-select: none;
+    }
+
+    .toggle-on {
+      background-color: var(--success-green);
+      color: white;
+    }
+
+    .toggle-off {
+      background-color: var(--error-red);
+      color: white;
+    }
+
+    .time-range-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .time-range-input input[type="text"] {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      flex-grow: 1;
+      min-width: 180px;
+      font-size: 1em;
+    }
+
+    .add-time-button {
+      background-color: var(--primary-blue);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: background-color 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .add-time-button:hover {
+      background-color: #0056b3;
+    }
+
+    .current-time-ranges-list {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .time-range-item {
+      background-color: #f9f9f9;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      font-weight: 600;
+      color: var(--text-dark);
+      user-select: none;
+    }
+
+    .remove-time-button {
+      background: none;
+      border: none;
+      color: var(--error-red);
+      cursor: pointer;
+      margin-left: 8px;
+      font-size: 1.2em;
+      line-height: 1;
+      user-select: none;
+      transition: color 0.2s ease;
+    }
+
+    .remove-time-button:hover {
+      color: #a71d2a;
+    }
+
+    /* Tables */
+    .data-table-section {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    .data-table-section h2 {
+      color: var(--text-dark);
+      font-size: 1.8em;
+      margin-bottom: 15px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .data-table th {
+      background-color: var(--light-blue);
+      color: var(--primary-blue);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .action-button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      font-size: 0.9em;
+      transition: background-color 0.2s ease;
+      user-select: none;
+    }
+
+    .edit-button {
+      background-color: var(--warning-yellow);
+      color: var(--text-dark);
+    }
+
+    .edit-button:hover {
+      background-color: #e0a800;
+    }
+
+    .delete-button {
+      background-color: var(--error-red);
+      color: white;
+    }
+
+    .delete-button:hover {
+      background-color: #a71d2a;
+    }
+
+    .view-button {
+      background-color: var(--primary-blue);
+      color: white;
+    }
+
+    .view-button:hover {
+      background-color: #0056b3;
+    }
+
+    .join-link-admin {
+      color: var(--primary-blue);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .join-link-admin:hover {
+      text-decoration: underline;
+    }
+
+    /* Meeting Link Management */
+    .meeting-link-section {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      max-width: 600px;
+    }
+
+    .meeting-link-section h2 {
+      color: var(--text-dark);
+      font-size: 1.8em;
+      margin-bottom: 15px;
+    }
+
+    .meeting-link-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .meeting-link-input-group label {
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .meeting-link-input-group input[type="text"] {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 1em;
+      width: 100%;
+    }
+
+    .save-meeting-link-btn {
+      margin-top: 15px;
+      background-color: var(--primary-blue);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1em;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+      user-select: none;
+      align-self: flex-start;
+    }
+
+    .save-meeting-link-btn:hover {
+      background-color: #0056b3;
+    }
+
+    /* Available Slots Upload Section */
+    .upload-slots-section {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      max-width: 600px;
+    }
+
+    .upload-slots-section h2 {
+      color: var(--text-dark);
+      font-size: 1.8em;
+      margin-bottom: 15px;
+    }
+
+    .upload-slots-section form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .upload-slots-section label {
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .upload-slots-section input[type="date"],
+    .upload-slots-section input[type="text"] {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 1em;
+      width: 100%;
+    }
+
+    .upload-slots-section textarea {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 1em;
+      width: 100%;
+      resize: vertical;
+      min-height: 80px;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .upload-slots-section button {
+      background-color: var(--primary-blue);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1em;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+      user-select: none;
+      align-self: flex-start;
+    }
+
+    .upload-slots-section button:hover {
+      background-color: #0056b3;
+    }
+
+    /* Utility Classes */
+    .hidden {
+      display: none !important;
+    }
+
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    /* Floating Alert Container */
+    #floating-alert-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 320px;
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .floating-alert {
+      padding: 14px 20px;
+      border-radius: 8px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.3s ease forwards;
+      cursor: default;
+      font-size: 1em;
+    }
+
+    .floating-alert.success {
+      background-color: var(--success-green);
+    }
+
+    .floating-alert.error {
+      background-color: var(--error-red);
+    }
+
+    .floating-alert.warning {
+      background-color: var(--warning-yellow);
+      color: #333;
+    }
+
+    .floating-alert.info {
+      background-color: var(--info-blue);
+    }
+
+    .floating-alert .icon {
+      font-size: 1.3em;
+      flex-shrink: 0;
+    }
+
+    .floating-alert .close-btn {
+      margin-left: auto;
+      background: transparent;
+      border: none;
+      color: inherit;
+      font-size: 1.2em;
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.2s ease;
+    }
+
+    .floating-alert .close-btn:hover {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Responsive tweaks */
+    @media (max-width: 768px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto 1fr;
+      }
+      .sidebar {
+        grid-row: 1 / 2;
+        grid-column: 1 / 2;
+        flex-direction: row;
+        justify-content: space-around;
+        padding: 10px 5px;
+      }
+      .sidebar h2 {
+        display: none;
+      }
+      .sidebar nav ul {
+        display: flex;
+        width: auto;
+      }
+      .sidebar nav li {
+        margin-bottom: 0;
+        margin-left: 10px;
+      }
+      .main-content {
+        grid-row: 2 / 4;
+        grid-column: 1 / 2;
+      }
+      .data-table {
+        min-width: 100%;
+      }
+      .time-range-input {
+        flex-direction: column;
+      }
+      .time-range-input input[type="text"] {
+        flex-grow: 0;
+        width: 100%;
+      }
+      .add-time-button {
+        width: 100%;
+      }
+      .dashboard-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .quick-actions-grid {
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      }
+      .content-area {
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar" role="navigation" aria-label="Admin navigation">
+    <h2>Admin Panel</h2>
+    <nav>
+      <ul>
+        <li><a href="#dashboard" class="active" data-section="dashboard" role="tab" aria-selected="true" tabindex="0"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a></li>
+        <li><a href="#time-slots" data-section="time-slots" role="tab" aria-selected="false" tabindex="-1"><i class="fas fa-clock mr-2"></i> Time Slot Management</a></li>
+        <li><a href="#upload-slots" data-section="upload-slots" role="tab" aria-selected="false" tabindex="-1"><i class="fas fa-upload mr-2"></i> Upload Available Slots</a></li>
+        <li><a href="#current-bookings" data-section="current-bookings" role="tab" aria-selected="false" tabindex="-1"><i class="fas fa-calendar-alt mr-2"></i> Current Bookings</a></li>
+        <li><a href="#available-slots" data-section="available-slots" role="tab" aria-selected="false" tabindex="-1"><i class="fas fa-list-ul mr-2"></i> Available Slots</a></li>
+        <li><a href="#meeting-link" data-section="meeting-link" role="tab" aria-selected="false" tabindex="-1"><i class="fas fa-link mr-2"></i> Meeting Link</a></li>
+        <li><a href="#" role="button" id="logout-btn"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="main-content" role="main">
+    <div class="header">
+      <h1>Admin Dashboard</h1>
+    </div>
+    <div class="content-area" id="contentArea">
+      <div id="loading-overlay" aria-hidden="true" aria-label="Loading">
+        <div class="spinner" role="status" aria-live="polite" aria-busy="true"></div>
+      </div>
+
+      <section id="dashboard" role="tabpanel" tabindex="0" aria-label="Dashboard section">
+        <div class="dashboard-grid" aria-live="polite" aria-atomic="true">
+          <div class="dashboard-card" aria-label="Today's Bookings">
+            <h3>Today's Bookings</h3>
+            <p id="todays-bookings-count">0</p>
+            <div class="chart-container">
+              <canvas id="todaysBookingsChart" aria-label="Bar chart showing today's bookings over last 7 days" role="img"></canvas>
+            </div>
+          </div>
+          <div class="dashboard-card" aria-label="Lifetime Bookings">
+            <h3>Lifetime Bookings</h3>
+            <p id="lifetime-bookings-count">0</p>
+            <div class="chart-container">
+              <canvas id="lifetimeBookingsChart" aria-label="Line chart showing lifetime bookings growth" role="img"></canvas>
+            </div>
+          </div>
+          <div class="dashboard-card" aria-label="Today's Slots Left">
+            <h3>Today's Slots Left</h3>
+            <p id="todays-slots-left">0</p>
+            <div class="chart-container">
+              <canvas id="slotsLeftChart" aria-label="Pie chart showing today's slots left vs booked" role="img"></canvas>
+            </div>
+          </div>
+          <div class="dashboard-card" aria-label="All-Time Meetings">
+            <h3>All-Time Meetings</h3>
+            <p id="all-time-meetings-count">0</p>
+            <div class="chart-container">
+              <canvas id="allTimeMeetingsChart" aria-label="Doughnut chart showing all-time meetings by month" role="img"></canvas>
+            </div>
+          </div>
+          <div class="dashboard-card" aria-label="Average Daily Bookings">
+            <h3>Average Daily Bookings</h3>
+            <p id="avg-daily-bookings">0</p>
+            <div class="chart-container">
+              <canvas id="avgDailyBookingsChart" aria-label="Area chart showing average daily bookings" role="img"></canvas>
+            </div>
+          </div>
+          <div class="dashboard-card" aria-label="Quick Actions">
+            <h3>Quick Actions</h3>
+            <div class="quick-actions-grid">
+              <div class="fab-wrapper" title="Add Booking">
+                <div class="fab-button" id="fab-add-booking" tabindex="0" role="button" aria-label="Add Booking"><i class="fas fa-plus"></i></div>
+                <div class="fab-label">Add Booking</div>
+              </div>
+              <div class="fab-wrapper" title="Add Available Slot">
+                <div class="fab-button" id="fab-add-slot" tabindex="0" role="button" aria-label="Add Available Slot"><i class="fas fa-calendar-plus"></i></div>
+                <div class="fab-label">Add Slot</div>
+              </div>
+              <div class="fab-wrapper" title="View Reports">
+                <div class="fab-button" id="fab-view-reports" tabindex="0" role="button" aria-label="View Reports"><i class="fas fa-chart-line"></i></div>
+                <div class="fab-label">Reports</div>
+              </div>
+              <div class="fab-wrapper" title="Manage Time Slots">
+                <div class="fab-button" id="fab-manage-time" tabindex="0" role="button" aria-label="Manage Time Slots"><i class="fas fa-clock"></i></div>
+                <div class="fab-label">Time Slots</div>
+              </div>
+              <div class="fab-wrapper" title="Logout">
+                <div class="fab-button" id="fab-logout" tabindex="0" role="button" aria-label="Logout"><i class="fas fa-sign-out-alt"></i></div>
+                <div class="fab-label">Logout</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="time-slots" class="hidden" role="tabpanel" tabindex="0" aria-label="Time Slot Management section">
+        <div class="time-management-section">
+          <h2>Time Slot Management</h2>
+          <div class="day-toggle">
+            <label for="monday-on">Monday:</label>
+            <button id="monday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Monday off" type="button">On</button>
+            <button id="monday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Monday on" type="button">Off</button>
+          </div>
+          <div class="day-toggle">
+            <label for="tuesday-on">Tuesday:</label>
+            <button id="tuesday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Tuesday off" type="button">On</button>
+            <button id="tuesday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Tuesday on" type="button">Off</button>
+          </div>
+          <div class="day-toggle">
+            <label for="wednesday-on">Wednesday:</label>
+            <button id="wednesday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Wednesday off" type="button">On</button>
+            <button id="wednesday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Wednesday on" type="button">Off</button>
+          </div>
+          <div class="day-toggle">
+            <label for="thursday-on">Thursday:</label>
+            <button id="thursday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Thursday off" type="button">On</button>
+            <button id="thursday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Thursday on" type="button">Off</button>
+          </div>
+          <div class="day-toggle">
+            <label for="friday-on">Friday:</label>
+            <button id="friday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Friday off" type="button">On</button>
+            <button id="friday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Friday on" type="button">Off</button>
+          </div>
+          <div class="day-toggle">
+            <label for="saturday-on">Saturday:</label>
+            <button id="saturday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Saturday off" type="button">On</button>
+            <button id="saturday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Saturday on" type="button">Off</button>
+          </div>
+          <div class="day-toggle">
+            <label for="sunday-on">Sunday:</label>
+            <button id="sunday-on" class="toggle-button toggle-on" aria-pressed="true" aria-label="Turn Sunday off" type="button">On</button>
+            <button id="sunday-off" class="toggle-button toggle-off hidden" aria-pressed="false" aria-label="Turn Sunday on" type="button">Off</button>
+          </div>
+
+          <div class="time-range-input">
+            <input type="text" id="add-time-range" placeholder="e.g., 10am-11pm" aria-label="Add time range input" />
+            <button id="add-time-btn" class="add-time-button" aria-label="Add time range button" type="button">Add Time Range</button>
+          </div>
+          <div id="current-time-ranges-list" class="current-time-ranges-list" aria-live="polite" aria-atomic="true" aria-relevant="additions removals"></div>
+        </div>
+      </section>
+
+      <section id="upload-slots" class="hidden" role="tabpanel" tabindex="0" aria-label="Upload Available Slots section">
+        <div class="upload-slots-section">
+          <h2>Upload Available Slots</h2>
+          <form id="uploadSlotsForm" novalidate>
+            <label for="slotDate">Select Date:</label>
+            <input type="date" id="slotDate" required aria-required="true" aria-describedby="slotDateError" />
+            <span id="slotDateError" class="sr-only" role="alert"></span>
+
+            <label for="slotTimes">Enter Time Slots (one per line, e.g., 10am-11am):</label>
+            <textarea id="slotTimes" placeholder="10am-11am&#10;11am-12pm&#10;1pm-2pm" required aria-required="true" aria-describedby="slotTimesError"></textarea>
+            <span id="slotTimesError" class="sr-only" role="alert"></span>
+
+            <button type="submit" aria-label="Upload Available Slots">Upload Slots</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="current-bookings" class="hidden" role="tabpanel" tabindex="0" aria-label="Current Bookings section">
+        <div class="data-table-section">
+          <h2>Current Bookings</h2>
+          <table id="current-bookings-table" class="data-table" aria-describedby="current-bookings-desc">
+            <caption id="current-bookings-desc" class="sr-only">Table showing current bookings with details and actions</caption>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Job Role</th>
+                <th scope="col">Date</th>
+                <th scope="col">Time</th>
+                <th scope="col">Meeting Link</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="available-slots" class="hidden" role="tabpanel" tabindex="0" aria-label="Available Slots section">
+        <div class="data-table-section">
+          <h2>Available Slots</h2>
+          <table id="available-slots-table" class="data-table" aria-describedby="available-slots-desc">
+            <caption id="available-slots-desc" class="sr-only">Table showing available slots with actions</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Time Slot</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="meeting-link" class="hidden" role="tabpanel" tabindex="0" aria-label="Meeting Link Management section">
+        <div class="meeting-link-section">
+          <h2>Meeting Link Management</h2>
+          <form id="meetingLinkForm" novalidate>
+            <div class="meeting-link-input-group">
+              <label for="meetingPlatformName">Meeting Platform Name:</label>
+              <input type="text" id="meetingPlatformName" placeholder="e.g., Zoom, Google Meet" autocomplete="off" required aria-required="true" />
+            </div>
+            <div class="meeting-link-input-group">
+              <label for="meetingLinkInput">Meeting Link URL:</label>
+              <input type="text" id="meetingLinkInput" placeholder="https://zoom.us/j/..." autocomplete="off" required aria-required="true" />
+            </div>
+            <button type="submit" class="save-meeting-link-btn" aria-label="Save Meeting Link">Save Meeting Link</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Floating Alert Container -->
+  <div id="floating-alert-container" aria-live="assertive" aria-atomic="true"></div>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // Firebase configuration (replace with your actual config)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAi0tUilFL85--_AAKyvgBXOXKTwbi6Z9Y",
+      authDomain: "blueminch-92cd8.firebaseapp.com",
+      databaseURL: "https://blueminch-92cd8-default-rtdb.firebaseio.com",
+      projectId: "blueminch-92cd8",
+      storageBucket: "blueminch-92cd8.firebasestorage.app",
+      messagingSenderId: "615302727699",
+      appId: "1:615302727699:android:e4c686863c61a7bc0c17e6"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Floating alert helper
+    const alertContainer = document.getElementById('floating-alert-container');
+    function showAlert(message, type = 'info', duration = 4000) {
+      const alert = document.createElement('div');
+      alert.className = `floating-alert ${type}`;
+      alert.setAttribute('role', 'alert');
+      alert.setAttribute('tabindex', '0');
+      alert.innerHTML = `
+        <span class="icon">${type === 'success' ? '<i class="fas fa-check-circle"></i>' : type === 'error' ? '<i class="fas fa-times-circle"></i>' : type === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' : '<i class="fas fa-info-circle"></i>'}</span>
+        <span class="message">${message}</span>
+        <button class="close-btn" aria-label="Close alert">&times;</button>
+      `;
+      alertContainer.appendChild(alert);
+      alert.focus();
+
+      const closeBtn = alert.querySelector('.close-btn');
+      closeBtn.addEventListener('click', () => {
+        alertContainer.removeChild(alert);
+      });
+
+      setTimeout(() => {
+        if (alertContainer.contains(alert)) {
+          alertContainer.removeChild(alert);
+        }
+      }, duration);
+    }
+
+    // Loading overlay control
+    const loadingOverlay = document.getElementById('loading-overlay');
+    function showLoading() {
+      loadingOverlay.classList.add('active');
+      loadingOverlay.setAttribute('aria-hidden', 'false');
+    }
+    function hideLoading() {
+      loadingOverlay.classList.remove('active');
+      loadingOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const dashboardSection = document.getElementById('dashboard');
+      const timeSlotsSection = document.getElementById('time-slots');
+      const uploadSlotsSection = document.getElementById('upload-slots');
+      const currentBookingsSection = document.getElementById('current-bookings');
+      const availableSlotsSection = document.getElementById('available-slots');
+      const meetingLinkSection = document.getElementById('meeting-link');
+      const navLinks = document.querySelectorAll('.sidebar nav a[data-section]');
+
+      const todaysBookingsCountElem = document.getElementById('todays-bookings-count');
+      const lifetimeBookingsCountElem = document.getElementById('lifetime-bookings-count');
+      const todaysSlotsLeftElem = document.getElementById('todays-slots-left');
+      const allTimeMeetingsCountElem = document.getElementById('all-time-meetings-count');
+      const avgDailyBookingsElem = document.getElementById('avg-daily-bookings');
+      const currentTimeRangesList = document.getElementById('current-time-ranges-list');
+      const addTimeInput = document.getElementById('add-time-range');
+      const addTimeBtn = document.getElementById('add-time-btn');
+      const currentBookingsTableBody = document.getElementById('current-bookings-table').querySelector('tbody');
+      const availableSlotsTableBody = document.getElementById('available-slots-table').querySelector('tbody');
+      const meetingPlatformNameInput = document.getElementById('meetingPlatformName');
+      const meetingLinkInput = document.getElementById('meetingLinkInput');
+      const meetingLinkForm = document.getElementById('meetingLinkForm');
+
+      const uploadSlotsForm = document.getElementById('uploadSlotsForm');
+      const slotDateInput = document.getElementById('slotDate');
+      const slotTimesInput = document.getElementById('slotTimes');
+      const slotDateError = document.getElementById('slotDateError');
+      const slotTimesError = document.getElementById('slotTimesError');
+
+      // Chart instances
+      let todaysBookingsChart, lifetimeBookingsChart, slotsLeftChart, allTimeMeetingsChart, avgDailyBookingsChart;
+
+      // Function to show the selected section and hide others
+      const showSection = (sectionId) => {
+        [dashboardSection, timeSlotsSection, uploadSlotsSection, currentBookingsSection, availableSlotsSection, meetingLinkSection].forEach(section => {
+          if (section.id === sectionId) {
+            section.classList.remove('hidden');
+            section.setAttribute('aria-hidden', 'false');
+            section.tabIndex = 0;
+          } else {
+            section.classList.add('hidden');
+            section.setAttribute('aria-hidden', 'true');
+            section.tabIndex = -1;
+          }
+        });
+
+        navLinks.forEach(link => {
+          if (link.dataset.section === sectionId) {
+            link.classList.add('active');
+            link.setAttribute('aria-selected', 'true');
+            link.tabIndex = 0;
+            link.focus();
+          } else {
+            link.classList.remove('active');
+            link.setAttribute('aria-selected', 'false');
+            link.tabIndex = -1;
+          }
+        });
+      };
+
+      // Event listeners for navigation links
+      navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const sectionId = e.currentTarget.dataset.section;
+          if (sectionId) {
+            showSection(sectionId);
+          }
+        });
+        link.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const sectionId = e.currentTarget.dataset.section;
+            if (sectionId) {
+              showSection(sectionId);
+            }
+          }
+        });
+      });
+
+      // Function to update the display of on/off buttons for days
+      const updateDayToggleButton = (day, isOn) => {
+        const onButton = document.getElementById(`${day}-on`);
+        const offButton = document.getElementById(`${day}-off`);
+        if (isOn) {
+          onButton.classList.remove('hidden');
+          offButton.classList.add('hidden');
+          onButton.setAttribute('aria-pressed', 'true');
+          offButton.setAttribute('aria-pressed', 'false');
+          onButton.setAttribute('aria-label', `Turn ${day.charAt(0).toUpperCase() + day.slice(1)} off`);
+          offButton.setAttribute('aria-label', `Turn ${day.charAt(0).toUpperCase() + day.slice(1)} on`);
+        } else {
+          onButton.classList.add('hidden');
+          offButton.classList.remove('hidden');
+          onButton.setAttribute('aria-pressed', 'false');
+          offButton.setAttribute('aria-pressed', 'true');
+          onButton.setAttribute('aria-label', `Turn ${day.charAt(0).toUpperCase() + day.slice(1)} off`);
+          offButton.setAttribute('aria-label', `Turn ${day.charAt(0).toUpperCase() + day.slice(1)} on`);
+        }
+      };
+
+      // Function to fetch and display the allowed time ranges
+      const fetchAndTimeRanges = () => {
+        showLoading();
+        database.ref('admin/allowedTimeRanges').once('value').then(snapshot => {
+          currentTimeRangesList.innerHTML = '';
+          const timeRanges = snapshot.val() || {};
+          Object.keys(timeRanges).forEach(key => {
+            const range = timeRanges[key];
+            const item = document.createElement('span');
+            item.classList.add('time-range-item');
+            item.textContent = range;
+            const removeButton = document.createElement('button');
+            removeButton.classList.add('remove-time-button');
+            removeButton.setAttribute('aria-label', `Remove time range ${range}`);
+            removeButton.innerHTML = '&times;';
+            removeButton.addEventListener('click', () => {
+              showAlert(`Removing time range "${range}"...`, 'info', 2000);
+              removeTimeRange(key);
+            });
+            item.appendChild(removeButton);
+            currentTimeRangesList.appendChild(item);
+          });
+          hideLoading();
+        }).catch(() => {
+          showAlert('Failed to load allowed time ranges.', 'error');
+          hideLoading();
+        });
+      };
+
+      // Function to add a new allowed time range to Firebase
+      const addTimeRange = () => {
+        const newRange = addTimeInput.value.trim();
+        if (!newRange) {
+          showAlert('Please enter a valid time range.', 'warning');
+          return;
+        }
+        showLoading();
+        database.ref('admin/allowedTimeRanges').push(newRange)
+          .then(() => {
+            showAlert(`Time range "${newRange}" added successfully.`, 'success');
+            addTimeInput.value = '';
+            fetchAndTimeRanges();
+            hideLoading();
+          })
+          .catch(() => {
+            showAlert('Failed to add time range. Please try again.', 'error');
+            hideLoading();
+          });
+      };
+
+      // Function to remove an allowed time range from Firebase
+      const removeTimeRange = (keyToRemove) => {
+        showLoading();
+        database.ref('admin/allowedTimeRanges/' + keyToRemove).remove()
+          .then(() => {
+            showAlert('Time range removed successfully.', 'success');
+            fetchAndTimeRanges();
+            hideLoading();
+          })
+          .catch(() => {
+            showAlert('Failed to remove time range. Please try again.', 'error');
+            hideLoading();
+          });
+      };
+
+      // Event listener for adding a new time range
+      addTimeBtn.addEventListener('click', addTimeRange);
+      addTimeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addTimeRange();
+        }
+      });
+
+      // Function to fetch and display current bookings
+      const fetchCurrentBookings = () => {
+        showLoading();
+        database.ref('bookings').once('value').then(snapshot => {
+          currentBookingsTableBody.innerHTML = '';
+          let todaysBookingCount = 0;
+          let lifetimeBookingCount = 0;
+          const today = new Date().toISOString().split('T')[0];
+
+          snapshot.forEach(dateSnapshot => {
+            dateSnapshot.forEach(bookingSnapshot => {
+              const booking = bookingSnapshot.val();
+              lifetimeBookingCount++;
+              const bookingDate = dateSnapshot.key;
+
+              const row = currentBookingsTableBody.insertRow();
+              row.insertCell().textContent = booking.name;
+              row.insertCell().textContent = booking.email;
+              row.insertCell().textContent = booking.jobRole;
+              row.insertCell().textContent = bookingDate;
+              row.insertCell().textContent = booking.time;
+              const meetingLinkCell = row.insertCell();
+              if (booking.meetingLink) {
+                const link = document.createElement('a');
+                link.href = booking.meetingLink;
+                link.textContent = 'Join';
+                link.classList.add('join-link-admin');
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                meetingLinkCell.appendChild(link);
+              } else {
+                meetingLinkCell.textContent = 'N/A';
+              }
+
+              const actionsCell = row.insertCell();
+              const deleteButton = document.createElement('button');
+              deleteButton.classList.add('action-button', 'delete-button');
+              deleteButton.textContent = 'Delete';
+              deleteButton.setAttribute('aria-label', `Delete booking for ${booking.name} on ${bookingDate} at ${booking.time}`);
+              deleteButton.addEventListener('click', () => {
+                if (confirm(`Are you sure you want to delete the booking for ${booking.name} on ${bookingDate} at ${booking.time}?`)) {
+                  showAlert('Deleting booking...', 'info', 2000);
+                  deleteBooking(dateSnapshot.key, bookingSnapshot.key);
+                }
+              });
+              actionsCell.appendChild(deleteButton);
+
+              if (bookingDate === today) {
+                todaysBookingCount++;
+              }
+            });
+          });
+
+          todaysBookingsCountElem.textContent = todaysBookingCount;
+          lifetimeBookingsCountElem.textContent = lifetimeBookingCount;
+          updateTodaysBookingsChart(todaysBookingCount);
+          updateLifetimeBookingsChart(lifetimeBookingCount);
+          updateAvgDailyBookingsChart();
+          updateAllTimeMeetingsCount();
+          hideLoading();
+        }).catch(() => {
+          showAlert('Failed to load current bookings.', 'error');
+          hideLoading();
+        });
+      };
+
+      // Function to delete a booking
+      const deleteBooking = (dateKey, bookingKey) => {
+        showLoading();
+        database.ref(`bookings/${dateKey}/${bookingKey}`).remove()
+          .then(() => {
+            showAlert('Booking deleted successfully.', 'success');
+            fetchAvailableSlots(); // Refresh slots left
+            fetchCurrentBookings();
+            hideLoading();
+          })
+          .catch(() => {
+            showAlert('Failed to delete booking. Please try again.', 'error');
+            hideLoading();
+          });
+      };
+
+      // Function to fetch and display available slots
+      const fetchAvailableSlots = () => {
+        showLoading();
+        database.ref('availableSlots').once('value').then(snapshot => {
+          availableSlotsTableBody.innerHTML = '';
+          let todaysSlots = 0;
+          const today = new Date().toISOString().split('T')[0];
+
+          snapshot.forEach(dateSnapshot => {
+            const date = dateSnapshot.key;
+            const slots = dateSnapshot.val();
+            if (slots) {
+              Object.keys(slots).forEach(timeSlot => {
+                if (slots[timeSlot]) {
+                  const row = availableSlotsTableBody.insertRow();
+                  row.insertCell().textContent = date;
+                  row.insertCell().textContent = timeSlot;
+                  const actionsCell = row.insertCell();
+                  const deleteButton = document.createElement('button');
+                  deleteButton.classList.add('action-button', 'delete-button');
+                  deleteButton.textContent = 'Remove';
+                  deleteButton.setAttribute('aria-label', `Remove available slot on ${date} at ${timeSlot}`);
+                  deleteButton.addEventListener('click', () => {
+                    if (confirm(`Are you sure you want to remove the available slot on ${date} at ${timeSlot}?`)) {
+                      showAlert('Removing available slot...', 'info', 2000);
+                      removeAvailableSlot(date, timeSlot);
+                    }
+                  });
+                  actionsCell.appendChild(deleteButton);
+
+                  if (date === today) {
+                    todaysSlots++;
+                  }
+                }
+              });
+            }
+          });
+
+          // Calculate today's slots left
+          database.ref('bookings').child(today).once('value').then(bookingsTodaySnapshot => {
+            const bookedSlotsToday = bookingsTodaySnapshot.numChildren();
+            const slotsLeft = Math.max(0, todaysSlots - bookedSlotsToday);
+            todaysSlotsLeftElem.textContent = slotsLeft;
+            updateSlotsLeftChart(slotsLeft, todaysSlots);
+            hideLoading();
+          }).catch(() => {
+            showAlert('Failed to calculate slots left.', 'error');
+            hideLoading();
+          });
+        }).catch(() => {
+          showAlert('Failed to load available slots.', 'error');
+          hideLoading();
+        });
+      };
+
+      // Function to remove an available slot
+      const removeAvailableSlot = (dateKey, timeSlot) => {
+        showLoading();
+        database.ref(`availableSlots/${dateKey}/${timeSlot}`).remove()
+          .then(() => {
+            showAlert('Available slot removed successfully.', 'success');
+            fetchAvailableSlots();
+            hideLoading();
+          })
+          .catch(() => {
+            showAlert('Failed to remove available slot. Please try again.', 'error');
+            hideLoading();
+          });
+      };
+
+      // Function to toggle the availability of a day
+      const toggleDayAvailability = (day) => {
+        const onButton = document.getElementById(`${day}-on`);
+        const offButton = document.getElementById(`${day}-off`);
+        const isCurrentlyOn = !onButton.classList.contains('hidden');
+
+        showLoading();
+        database.ref(`admin/availableDays/${day}`).set(!isCurrentlyOn)
+          .then(() => {
+            updateDayToggleButton(day, !isCurrentlyOn);
+            showAlert(`${day.charAt(0).toUpperCase() + day.slice(1)} is now ${!isCurrentlyOn ? 'enabled' : 'disabled'}.`, 'success');
+            // Optionally, clear available slots for the day if turned off
+            if (isCurrentlyOn) {
+              const today = new Date();
+              const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+              const dayIndex = daysOfWeek.indexOf(day);
+
+              // Remove all future available slots for this day
+              database.ref('availableSlots').once('value').then(snapshot => {
+                const updates = {};
+                snapshot.forEach(dateSnap => {
+                  const dateKey = dateSnap.key;
+                  const dateParts = dateKey.split('-');
+                  if (dateParts.length === 3) {
+                    const d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                    if (d >= today && d.getDay() === dayIndex) {
+                      updates[dateKey] = null;
+                    }
+                  }
+                });
+                if (Object.keys(updates).length > 0) {
+                  database.ref('availableSlots').update(updates).then(() => {
+                    fetchAvailableSlots();
+                    hideLoading();
+                  }).catch(() => {
+                    showAlert('Failed to remove slots for disabled day.', 'error');
+                    hideLoading();
+                  });
+                } else {
+                  hideLoading();
+                }
+              }).catch(() => {
+                showAlert('Failed to remove slots for disabled day.', 'error');
+                hideLoading();
+              });
+            } else {
+              hideLoading();
+            }
+          })
+          .catch(() => {
+            showAlert('Failed to update day availability. Please try again.', 'error');
+            hideLoading();
+          });
+      };
+
+      // Fetch initial state of available days and attach listeners
+      database.ref('admin/availableDays').once('value').then(snapshot => {
+        const availableDays = snapshot.val() || {};
+        const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        daysOfWeek.forEach(day => {
+          updateDayToggleButton(day, availableDays[day] !== false); // Default to true if not set
+          document.getElementById(`${day}-on`).addEventListener('click', () => toggleDayAvailability(day));
+          document.getElementById(`${day}-off`).addEventListener('click', () => toggleDayAvailability(day));
+        });
+      }).catch(() => {
+        showAlert('Failed to load available days.', 'error');
+      });
+
+      // Dashboard charts setup and update functions
+      function createChart(ctx, type, data, options) {
+        return new Chart(ctx, {
+          type,
+          data,
+          options,
+        });
+      }
+
+      // Update Today's Bookings Chart (Bar chart last 7 days)
+      function updateTodaysBookingsChart(todayCount) {
+        const ctx = document.getElementById('todaysBookingsChart').getContext('2d');
+        if (todaysBookingsChart) todaysBookingsChart.destroy();
+
+        const labels = [];
+        const dataPoints = [];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          labels.push(d.toLocaleDateString(undefined, { weekday: 'short' }));
+          dataPoints.push(0);
+        }
+
+        database.ref('bookings').once('value').then(snapshot => {
+          const counts = {};
+          snapshot.forEach(dateSnap => {
+            const dateKey = dateSnap.key;
+            if (dateKey) {
+              counts[dateKey] = dateSnap.numChildren();
+            }
+          });
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().slice(0, 10);
+            const idx = 6 - i;
+            dataPoints[idx] = counts[key] || 0;
+          }
+          todaysBookingsChart = createChart(ctx, 'bar', {
+            labels,
+            datasets: [{
+              label: "Bookings",
+              data: dataPoints,
+              backgroundColor: 'rgba(0, 123, 255, 0.7)',
+              borderRadius: 4,
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+          });
+        }).catch(() => {
+          // On error, show empty chart
+          todaysBookingsChart = createChart(ctx, 'bar', {
+            labels,
+            datasets: [{
+              label: "Bookings",
+              data: dataPoints,
+              backgroundColor: 'rgba(0, 123, 255, 0.7)',
+              borderRadius: 4,
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+          });
+        });
+      }
+
+      // Update Lifetime Bookings Chart (Line chart)
+      function updateLifetimeBookingsChart(lifetimeCount) {
+        const ctx = document.getElementById('lifetimeBookingsChart').getContext('2d');
+        if (lifetimeBookingsChart) lifetimeBookingsChart.destroy();
+
+        database.ref('bookings').once('value').then(snapshot => {
+          const monthlyCounts = {};
+          snapshot.forEach(dateSnap => {
+            const monthYear = dateSnap.key.slice(0, 7);
+            monthlyCounts[monthYear] = (monthlyCounts[monthYear] || 0) + dateSnap.numChildren();
+          });
+
+          const labels = [];
+          const dataPoints = [];
+          const now = new Date();
+          for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = d.toISOString().slice(0, 7);
+            labels.push(d.toLocaleString(undefined, { month: 'short' }));
+            dataPoints.push(monthlyCounts[key] || 0);
+          }
+
+          lifetimeBookingsChart = createChart(ctx, 'line', {
+            labels,
+            datasets: [{
+              label: "Lifetime Bookings",
+              data: dataPoints,
+              fill: false,
+              borderColor: 'rgba(0, 123, 255, 0.9)',
+              tension: 0.3,
+              pointRadius: 4,
+              pointBackgroundColor: 'rgba(0, 123, 255, 0.9)',
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 10 } }
+            }
+          });
+        }).catch(() => {
+          lifetimeBookingsChart = createChart(ctx, 'line', {
+            labels: [],
+            datasets: [{
+              label: "Lifetime Bookings",
+              data: [],
+              fill: false,
+              borderColor: 'rgba(0, 123, 255, 0.9)',
+              tension: 0.3,
+              pointRadius: 4,
+              pointBackgroundColor: 'rgba(0, 123, 255, 0.9)',
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 10 } }
+            }
+          });
+        });
+      }
+
+      // Update Slots Left Chart (Pie chart)
+      function updateSlotsLeftChart(slotsLeft, totalSlots) {
+        const ctx = document.getElementById('slotsLeftChart').getContext('2d');
+        if (slotsLeftChart) slotsLeftChart.destroy();
+
+        const bookedSlots = totalSlots - slotsLeft;
+        slotsLeftChart = createChart(ctx, 'pie', {
+          labels: ['Slots Left', 'Booked Slots'],
+          datasets: [{
+            data: [slotsLeft, bookedSlots],
+            backgroundColor: ['#28a745', '#dc3545'],
+            hoverOffset: 10,
+          }]
+        }, {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        });
+      }
+
+      // Update All-Time Meetings Count and Chart (Doughnut chart)
+      function updateAllTimeMeetingsCount() {
+        database.ref('bookings').once('value').then(snapshot => {
+          let totalMeetings = 0;
+          const monthlyCounts = {};
+          snapshot.forEach(dateSnapshot => {
+            dateSnapshot.forEach(() => {
+              totalMeetings++;
+              const monthYear = dateSnapshot.key.slice(0, 7);
+              monthlyCounts[monthYear] = (monthlyCounts[monthYear] || 0) + 1;
+            });
+          });
+          allTimeMeetingsCountElem.textContent = totalMeetings;
+
+          const labels = [];
+          const dataPoints = [];
+          const now = new Date();
+          for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = d.toISOString().slice(0, 7);
+            labels.push(d.toLocaleString(undefined, { month: 'short' }));
+            dataPoints.push(monthlyCounts[key] || 0);
+          }
+
+          const ctx = document.getElementById('allTimeMeetingsChart').getContext('2d');
+          if (allTimeMeetingsChart) allTimeMeetingsChart.destroy();
+
+          allTimeMeetingsChart = createChart(ctx, 'doughnut', {
+            labels,
+            datasets: [{
+              data: dataPoints,
+              backgroundColor: [
+                '#007bff', '#6610f2', '#6f42c1', '#e83e8c', '#dc3545', '#fd7e14'
+              ],
+              hoverOffset: 20,
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } }
+          });
+        }).catch(() => {
+          const ctx = document.getElementById('allTimeMeetingsChart').getContext('2d');
+          if (allTimeMeetingsChart) allTimeMeetingsChart.destroy();
+          allTimeMeetingsChart = createChart(ctx, 'doughnut', {
+            labels: [],
+            datasets: [{
+              data: [],
+              backgroundColor: [],
+              hoverOffset: 20,
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } }
+          });
+        });
+      }
+
+      // Update Average Daily Bookings (Area chart)
+      function updateAvgDailyBookingsChart() {
+        database.ref('bookings').once('value').then(snapshot => {
+          const dailyCounts = {};
+          snapshot.forEach(dateSnapshot => {
+            dailyCounts[dateSnapshot.key] = dateSnapshot.numChildren();
+          });
+
+          const labels = [];
+          const dataPoints = [];
+          const now = new Date();
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().slice(0, 10);
+            labels.push(d.toLocaleDateString(undefined, { weekday: 'short' }));
+            dataPoints.push(dailyCounts[key] || 0);
+          }
+
+          const ctx = document.getElementById('avgDailyBookingsChart').getContext('2d');
+          if (avgDailyBookingsChart) avgDailyBookingsChart.destroy();
+
+          avgDailyBookingsChart = createChart(ctx, 'line', {
+            labels,
+            datasets: [{
+              label: 'Daily Bookings',
+              data: dataPoints,
+              fill: true,
+              backgroundColor: 'rgba(0, 123, 255, 0.2)',
+              borderColor: 'rgba(0, 123, 255, 0.8)',
+              tension: 0.3,
+              pointRadius: 3,
+              pointBackgroundColor: 'rgba(0, 123, 255, 0.8)',
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+          });
+
+          const sum = dataPoints.reduce((a, b) => a + b, 0);
+          const avg = (sum / dataPoints.length).toFixed(1);
+          avgDailyBookingsElem.textContent = avg;
+        }).catch(() => {
+          const ctx = document.getElementById('avgDailyBookingsChart').getContext('2d');
+          if (avgDailyBookingsChart) avgDailyBookingsChart.destroy();
+          avgDailyBookingsChart = createChart(ctx, 'line', {
+            labels: [],
+            datasets: [{
+              label: 'Daily Bookings',
+              data: [],
+              fill: true,
+              backgroundColor: 'rgba(0, 123, 255, 0.2)',
+              borderColor: 'rgba(0, 123, 255, 0.8)',
+              tension: 0.3,
+              pointRadius: 3,
+              pointBackgroundColor: 'rgba(0, 123, 255, 0.8)',
+            }]
+          }, {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+          });
+          avgDailyBookingsElem.textContent = '0';
+        });
+      }
+
+      // Meeting Link Management
+      const fetchMeetingLink = () => {
+        showLoading();
+        database.ref('admin/meetingLink').once('value').then(snapshot => {
+          const data = snapshot.val() || {};
+          meetingPlatformNameInput.value = data.platformName || '';
+          meetingLinkInput.value = data.link || '';
+          hideLoading();
+        }).catch(() => {
+          showAlert('Failed to load meeting link.', 'error');
+          hideLoading();
+        });
+      };
+
+      meetingLinkForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const platformName = meetingPlatformNameInput.value.trim();
+        const link = meetingLinkInput.value.trim();
+
+        if (!platformName) {
+          showAlert('Meeting platform name is required.', 'warning');
+          meetingPlatformNameInput.focus();
+          return;
+        }
+        if (!link || !/^https?:\/\/.+/.test(link)) {
+          showAlert('Please enter a valid meeting link URL.', 'warning');
+          meetingLinkInput.focus();
+          return;
+        }
+
+        showLoading();
+        database.ref('admin/meetingLink').set({ platformName, link })
+          .then(() => {
+            showAlert('Meeting link saved successfully.', 'success');
+            hideLoading();
+          })
+          .catch(() => {
+            showAlert('Failed to save meeting link. Please try again.', 'error');
+            hideLoading();
+          });
+      });
+
+      // Upload Available Slots Form Submission
+      uploadSlotsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        slotDateError.textContent = '';
+        slotTimesError.textContent = '';
+
+        const dateValue = slotDateInput.value;
+        const timesValue = slotTimesInput.value.trim();
+
+        if (!dateValue) {
+          slotDateError.textContent = 'Date is required.';
+          slotDateInput.focus();
+          return;
+        }
+
+        if (!timesValue) {
+          slotTimesError.textContent = 'Please enter at least one time slot.';
+          slotTimesInput.focus();
+          return;
+        }
+
+        // Validate date is today or future
+        const selectedDate = new Date(dateValue);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        if (selectedDate < today) {
+          slotDateError.textContent = 'Date cannot be in the past.';
+          slotDateInput.focus();
+          return;
+        }
+
+        // Parse time slots, one per line, trim each
+        const timeSlots = timesValue.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+
+        // Validate time slot format (simple regex: e.g. 10am-11am)
+        const timeSlotRegex = /^(\d{1,2})(am|pm)-(\d{1,2})(am|pm)$/i;
+        for (const slot of timeSlots) {
+          if (!timeSlotRegex.test(slot)) {
+            slotTimesError.textContent = `Invalid time slot format: "${slot}". Use format like 10am-11am.`;
+            slotTimesInput.focus();
+            return;
+          }
+        }
+
+        showLoading();
+
+        const dateKey = dateValue;
+
+        try {
+          // Fetch existing slots for the date
+          const existingSlotsSnap = await database.ref(`availableSlots/${dateKey}`).once('value');
+          const existingSlots = existingSlotsSnap.val() || {};
+
+          // Add new slots, set true for each
+          const updates = {};
+          timeSlots.forEach(slot => {
+            updates[slot] = true;
+          });
+
+          // Merge with existing slots
+          const mergedSlots = {...existingSlots, ...updates};
+
+          await database.ref(`availableSlots/${dateKey}`).set(mergedSlots);
+
+          showAlert(`Available slots for ${dateKey} uploaded successfully.`, 'success');
+
+          // Clear form
+          slotDateInput.value = '';
+          slotTimesInput.value = '';
+
+          // Refresh available slots table
+          fetchAvailableSlots();
+        } catch (error) {
+          console.error('Error uploading slots:', error);
+          showAlert('Failed to upload available slots. Please try again.', 'error');
+        } finally {
+          hideLoading();
+        }
+      });
+
+      // Quick Actions handlers
+      document.getElementById('fab-add-booking').addEventListener('click', () => {
+        showAlert('Quick Action: Add Booking clicked.', 'info');
+        showSection('current-bookings');
+      });
+      document.getElementById('fab-add-slot').addEventListener('click', () => {
+        showAlert('Quick Action: Add Available Slot clicked.', 'info');
+        showSection('upload-slots');
+      });
+      document.getElementById('fab-view-reports').addEventListener('click', () => {
+        showAlert('Quick Action: View Reports clicked.', 'info');
+      });
+      document.getElementById('fab-manage-time').addEventListener('click', () => {
+        showAlert('Quick Action: Manage Time Slots clicked.', 'info');
+        showSection('time-slots');
+      });
+      document.getElementById('fab-logout').addEventListener('click', () => {
+        if (confirm('Are you sure you want to logout?')) {
+          showAlert('Logging out...', 'info');
+          setTimeout(() => {
+            showAlert('Logged out successfully.', 'success');
+          }, 1500);
+        }
+      });
+
+      // Logout button in sidebar
+      document.getElementById('logout-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (confirm('Are you sure you want to logout?')) {
+          showAlert('Logging out...', 'info');
+          setTimeout(() => {
+            showAlert('Logged out successfully.', 'success');
+          }, 1500);
+        }
+      });
+
+      // Initial data fetching and UI setup
+      showSection('dashboard');
+      fetchAndTimeRanges();
+      fetchCurrentBookings();
+      fetchAvailableSlots();
+      fetchMeetingLink();
+    });
+  </script>
+</body>
+</html>
